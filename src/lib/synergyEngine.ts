@@ -18,13 +18,11 @@ const mockResponses: Record<string, string> = {
 };
 
 const mockSynthesis =
-  "By synthesising diverse perspectives from multiple leading AI models — including GPT, Claude, Gemini, DeepSeek, Grok, and Kimi — we arrive at a robust conclusion: the most effective approach combines structural logic, first-principles reasoning, real-time data awareness, and factual grounding. This eliminates individual model biases for a superior, unified answer.";
+  "Demo mode — backend not reachable. Start the backend server and check that server/.env has valid API keys.";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 const PEKPIK_PROVIDERS = new Set(['pekpik', 'xai', 'kimi']);
 
-/* ─── Result type for provider calls ───────────────────── */
 interface CallResult {
   content: string;
   usedModel: string;
@@ -34,7 +32,23 @@ interface CallResult {
   originalProvider?: string;
 }
 
-/* ─── Backend status ───────────────────────────────────── */
+/* ─── Health cache — avoid re-pinging on every message ── */
+let _healthCache: { alive: boolean; at: number } | null = null;
+const HEALTH_TTL = 20_000; // 20 seconds
+
+async function isBackendAlive(): Promise<boolean> {
+  const now = Date.now();
+  if (_healthCache && now - _healthCache.at < HEALTH_TTL) return _healthCache.alive;
+  try {
+    const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(5000) });
+    _healthCache = { alive: res.ok, at: now };
+  } catch {
+    _healthCache = { alive: false, at: now };
+  }
+  return _healthCache.alive;
+}
+
+/* ─── Exported status (for UI banner) ─────────────────── */
 export async function getBackendStatus(): Promise<Record<string, boolean>> {
   try {
     const res = await fetch(`${API_BASE}/status`, { signal: AbortSignal.timeout(4000) });
@@ -46,9 +60,8 @@ export async function getBackendStatus(): Promise<Record<string, boolean>> {
   }
 }
 
-/* ─── Language system message ──────────────────────────── */
-function buildSystemMessage(lang: DetectedLanguage): { role: 'system'; content: string } {
-  return { role: 'system', content: lang.systemInstruction };
+function buildSystemMessage(lang: DetectedLanguage) {
+  return { role: 'system' as const, content: lang.systemInstruction };
 }
 
 /* ─── Main entry point ─────────────────────────────────── */
@@ -60,17 +73,26 @@ export async function processSynergy(
   detectedLanguage: DetectedLanguage = DEFAULT_LANGUAGE,
 ): Promise<{ modelResponses: ModelResponse[]; synthesis: string }> {
 
-  const backendStatus = await getBackendStatus();
-  const hasBackendKeys = Object.values(backendStatus).some(Boolean);
-  const hasLocalKeys   = providers.some((p) => p.apiKey);
-  const isDemoMode     = !hasBackendKeys && !hasLocalKeys;
+  // ── Gate: health check (fast ping), NOT key-status check ──
+  // This prevents false demo-mode when /api/status is slow.
+  const backendAlive = await isBackendAlive();
+  const hasLocalKeys = providers.some((p) => p.apiKey);
 
-  if (isDemoMode) return runDemoSynergy(providers, onProgress);
+  if (!backendAlive && !hasLocalKeys) {
+    console.warn('[SynergyEngine] Backend unreachable and no local keys — demo mode');
+    return runDemoSynergy(providers, onProgress);
+  }
 
-  const enabledProviders = providers.filter(
-    (p) => p.enabled && (backendStatus[p.id] || !!p.apiKey)
-  );
-  if (enabledProviders.length === 0) return runDemoSynergy(providers, onProgress);
+  // All enabled providers are included; the backend handles key errors + fallback
+  const enabledProviders = providers.filter((p) => {
+    if (!p.enabled) return false;
+    if (backendAlive) return true;   // Backend will handle — include all
+    return !!p.apiKey;               // Direct mode: only those with a local key
+  });
+
+  if (enabledProviders.length === 0) {
+    return runDemoSynergy(providers, onProgress);
+  }
 
   const promises = enabledProviders.map(async (provider) => {
     const pStart = Date.now();
@@ -81,8 +103,7 @@ export async function processSynergy(
           content: '', responseTimeMs: 0, tokensUsed: 0, status: 'streaming',
         });
       }
-      const useBackend = !!backendStatus[provider.id];
-      const result = await fetchFromProvider(provider, message, history, useBackend, detectedLanguage);
+      const result = await fetchFromProvider(provider, message, history, backendAlive, detectedLanguage);
       const modelResult: ModelResponse = {
         providerId: provider.id,
         model: result.usedModel,
@@ -112,22 +133,28 @@ export async function processSynergy(
 
   const modelResponses = await Promise.all(promises);
   const successfulResponses = modelResponses.filter((r) => r.status === 'done');
-  let synthesis = 'Synthesis unavailable — no successful model responses.';
 
-  if (successfulResponses.length > 0) {
-    const preferredOrder = ['pekpik', 'openai', 'anthropic', 'google', 'deepseek', 'groq', 'cerebras', 'mistral', 'xai', 'kimi'];
-    const synthesisProviderId =
-      preferredOrder.find((id) => successfulResponses.some((r) => r.providerId === id)) ??
-      successfulResponses[0].providerId;
-    const synthesisProvider =
-      enabledProviders.find((p) => p.id === synthesisProviderId) ?? enabledProviders[0];
-    const useBackend = !!backendStatus[synthesisProvider.id];
+  if (successfulResponses.length === 0) {
+    return {
+      modelResponses,
+      synthesis: '⚠️ All models failed to respond. Check the backend logs for details — API keys may need renewal.',
+    };
+  }
 
-    const langInstruction = detectedLanguage.code !== 'en'
-      ? `\n\nCRITICAL: Your synthesis MUST be written entirely in ${detectedLanguage.name} (${detectedLanguage.nativeName}). Do not use English or any other language.`
-      : '';
+  // ── Synthesis ──────────────────────────────────────────
+  // Prefer Groq or Cerebras (most reliable) for synthesis
+  const preferredOrder = ['groq', 'cerebras', 'pekpik', 'openai', 'anthropic', 'google', 'deepseek', 'mistral', 'xai', 'kimi'];
+  const synthesisProviderId =
+    preferredOrder.find((id) => successfulResponses.some((r) => r.usedProvider === id || r.providerId === id)) ??
+    successfulResponses[0].providerId;
+  const synthesisProvider =
+    enabledProviders.find((p) => p.id === synthesisProviderId) ?? enabledProviders[0];
 
-    const synthesisPrompt =
+  const langInstruction = detectedLanguage.code !== 'en'
+    ? `\n\nCRITICAL: Your synthesis MUST be written entirely in ${detectedLanguage.name} (${detectedLanguage.nativeName}). Do not use English or any other language.`
+    : '';
+
+  const synthesisPrompt =
 `You are the Synthesis Agent. Below are responses from multiple AI models to a user query.
 Synthesise them into ONE superior, cohesive answer that captures the best insights from each.
 Do NOT mention model names, that you are an AI, or that you are synthesising. Just give the best possible answer.${langInstruction}
@@ -137,29 +164,27 @@ User Query: ${message}
 Model Responses:
 ${successfulResponses.map((r) => `--- ${r.usedProvider ?? r.providerId} / ${r.model} ---\n${r.content}`).join('\n\n')}`;
 
-    try {
-      const synthResult = await fetchFromProvider(
-        synthesisProvider, synthesisPrompt, [], useBackend, detectedLanguage
-      );
-      synthesis = synthResult.content;
-    } catch {
-      synthesis = successfulResponses.length === 1
-        ? successfulResponses[0].content
-        : 'Synthesis failed. See individual model responses below.';
-    }
+  let synthesis: string;
+  try {
+    const synthResult = await fetchFromProvider(synthesisProvider, synthesisPrompt, [], backendAlive, detectedLanguage);
+    synthesis = synthResult.content;
+  } catch {
+    synthesis = successfulResponses.length === 1
+      ? successfulResponses[0].content
+      : successfulResponses.map((r) => r.content).join('\n\n---\n\n');
   }
 
   return { modelResponses, synthesis };
 }
 
-/* ─── Demo mode ────────────────────────────────────────── */
+/* ─── Demo mode (only when backend truly unreachable) ──── */
 async function runDemoSynergy(
   providers: Provider[],
   onProgress?: (partial: ModelResponse) => void,
 ) {
   const enabledProviders = providers.filter((p) => p.enabled);
   const promises = enabledProviders.map(async (provider) => {
-    const jitter = Math.random() * 2000 + 800;
+    const jitter = Math.random() * 1500 + 500;
     if (onProgress) {
       onProgress({
         providerId: provider.id, model: provider.model,
@@ -176,7 +201,7 @@ async function runDemoSynergy(
     return result;
   });
   const modelResponses = await Promise.all(promises);
-  await delay(1200);
+  await delay(800);
   return { modelResponses, synthesis: mockSynthesis };
 }
 
@@ -189,16 +214,13 @@ async function fetchFromProvider(
   lang: DetectedLanguage = DEFAULT_LANGUAGE,
 ): Promise<CallResult> {
   const systemMsg = buildSystemMessage(lang);
-
   const messages: { role: string; content: string }[] = [
     systemMsg,
-    ...history
-      .filter((h) => h.role !== 'system')
-      .map((h) => ({ role: h.role, content: h.content })),
+    ...history.filter((h) => h.role !== 'system').map((h) => ({ role: h.role, content: h.content })),
     { role: 'user', content: message },
   ];
 
-  // ── Backend proxy (with server-side automatic fallback) ──
+  // ── Backend proxy (server handles all fallback logic) ──
   if (useBackend) {
     const res = await fetch(`${API_BASE}/proxy`, {
       method: 'POST',
@@ -220,27 +242,17 @@ async function fetchFromProvider(
     };
   }
 
-  // ── Direct call (no backend — uses localStorage key) ─────
-
+  // ── Direct call (local API key in Settings) ───────────
   if (PEKPIK_PROVIDERS.has(provider.id)) {
-    if (!provider.apiKey)
-      throw new Error(`FreeLLM Hub key required for ${provider.id}. Add it in Settings or start the backend.`);
+    if (!provider.apiKey) throw new Error(`No local key for ${provider.id}. Start the backend.`);
     const res = await fetch(`${PEKPIK_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
       body: JSON.stringify({ model: provider.model, messages }),
     });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return {
-      content: data.choices[0].message.content,
-      usedModel: provider.model,
-      usedProvider: provider.id,
-      fallbackUsed: false,
-    };
+    return { content: data.choices[0].message.content, usedModel: provider.model, usedProvider: provider.id, fallbackUsed: false };
   }
 
   const directEndpoints: Record<string, string> = {
@@ -250,58 +262,34 @@ async function fetchFromProvider(
     groq:     'https://api.groq.com/openai/v1/chat/completions',
     cerebras: 'https://api.cerebras.ai/v1/chat/completions',
   };
-
   if (directEndpoints[provider.id]) {
     const res = await fetch(directEndpoints[provider.id], {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
       body: JSON.stringify({ model: provider.model, messages }),
     });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return {
-      content: data.choices[0].message.content,
-      usedModel: provider.model,
-      usedProvider: provider.id,
-      fallbackUsed: false,
-    };
+    return { content: data.choices[0].message.content, usedModel: provider.model, usedProvider: provider.id, fallbackUsed: false };
   }
 
   if (provider.id === 'google') {
-    const geminiContents: { role: string; parts: { text: string }[] }[] = [
+    const geminiContents = [
       { role: 'user',  parts: [{ text: systemMsg.content }] },
-      { role: 'model', parts: [{ text: 'Understood. I will follow these instructions.' }] },
-      ...history
-        .filter((m) => m.role !== 'system')
-        .map((m) => ({
-          role: m.role === 'user' ? 'user' : 'model',
-          parts: [{ text: m.content }],
-        })),
+      { role: 'model', parts: [{ text: 'Understood.' }] },
+      ...history.filter((m) => m.role !== 'system').map((m) => ({
+        role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }],
+      })),
       { role: 'user', parts: [{ text: message }] },
     ];
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${provider.model}:generateContent?key=${provider.apiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: geminiContents }) }
     );
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      throw new Error(`Google HTTP ${res.status}: ${txt.slice(0, 200)}`);
-    }
+    if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
     const data = await res.json();
-    return {
-      content: data.candidates[0].content.parts[0].text,
-      usedModel: provider.model,
-      usedProvider: provider.id,
-      fallbackUsed: false,
-    };
+    return { content: data.candidates[0].content.parts[0].text, usedModel: provider.model, usedProvider: provider.id, fallbackUsed: false };
   }
 
-  if (provider.id === 'anthropic') {
-    throw new Error('Anthropic requires the backend proxy (CORS). Start the backend server and add ANTHROPIC_API_KEY to server/.env');
-  }
-
-  throw new Error(`Unsupported provider: ${provider.id}`);
+  throw new Error(`Provider ${provider.id} requires the backend proxy.`);
 }

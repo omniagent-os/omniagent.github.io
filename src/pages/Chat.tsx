@@ -204,6 +204,7 @@ export default function Chat() {
   const [liveSynthesis, setLiveSynthesis] = useState("");
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [backendReady, setBackendReady]   = useState<Record<string, boolean>>({});
+  const [backendAlive, setBackendAlive]   = useState<boolean | null>(null);
 
   // Language detection state
   // inputLang: detected from current input (live preview)
@@ -217,8 +218,13 @@ export default function Chat() {
 
   const activeConv = conversations.find((c) => c.id === activeConvId) || null;
 
-  // Backend status check on mount
+  // Backend health + status check on mount
   useEffect(() => {
+    // Health ping — determines real vs demo mode
+    fetch("/api/health", { signal: AbortSignal.timeout(5000) })
+      .then((r) => setBackendAlive(r.ok))
+      .catch(() => setBackendAlive(false));
+    // Status — which providers have keys (for the banner list)
     getBackendStatus().then(setBackendReady);
   }, []);
 
@@ -417,10 +423,11 @@ export default function Chat() {
   }, [activeConv]);
 
   const enabledCount   = settings.providers.filter((p) => p.enabled).length;
-  const hasBackendKeys = Object.values(backendReady).some(Boolean);
   const hasLocalKeys   = settings.providers.some((p) => p.apiKey);
-  const isDemoMode     = !hasBackendKeys && !hasLocalKeys;
-  const backendActive  = hasBackendKeys;
+  // isDemoMode is ONLY true when the backend health ping fails AND there are no local keys.
+  // A slow /api/status response no longer triggers demo mode.
+  const isDemoMode     = backendAlive === false && !hasLocalKeys;
+  const backendActive  = backendAlive === true;
 
   // Placeholder adapts to detected language
   const placeholderText = useMemo(() => {
