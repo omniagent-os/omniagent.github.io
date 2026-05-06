@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 const DEFAULT_BASE_PATH = "/omniagent.github.io/";
-const DEFAULT_PORT = 3000;
+const DEFAULT_PORT = 5000;
 const BACKEND_PORT = 3001;
 
 function normalizeBasePath(basePath: string) {

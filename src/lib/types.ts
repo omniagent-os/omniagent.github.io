@@ -1,5 +1,5 @@
 export type Provider = {
-  id: string; // 'openai' | 'anthropic' | 'google' | 'mistral' | 'deepseek' | 'groq'
+  id: string;
   label: string;
   apiKey: string;
   model: string;
@@ -15,12 +15,18 @@ export type ModelResponse = {
   tokensUsed: number;
   status: 'pending' | 'streaming' | 'done' | 'error';
   error?: string;
+  // Set when server automatically fell back to a different model/provider
+  fallbackUsed?: boolean;
+  usedModel?: string;
+  usedProvider?: string;
+  originalModel?: string;
+  originalProvider?: string;
 };
 
 export type Message = {
   id: string;
   role: 'user' | 'assistant';
-  content: string; // synthesized response for assistant
+  content: string;
   modelResponses?: ModelResponse[];
   timestamp: number;
 };

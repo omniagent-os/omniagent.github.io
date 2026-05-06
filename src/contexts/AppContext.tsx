@@ -1,3 +1,4 @@
+// @refresh reset
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { type AppSettings, type Provider } from '@/lib/types';
 import { getSettings, saveSettings as saveSettingsToStorage } from '@/lib/storage';
@@ -14,8 +15,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => getSettings());
-  
-  // Theme effect
+
   useEffect(() => {
     const isDark = settings.theme === 'dark';
     if (isDark) {
@@ -35,7 +35,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateProvider = (providerId: string, updates: Partial<Provider>) => {
     setSettings(prev => {
-      const updatedProviders = prev.providers.map(p => 
+      const updatedProviders = prev.providers.map(p =>
         p.id === providerId ? { ...p, ...updates } : p
       );
       const updated = { ...prev, providers: updatedProviders };
@@ -54,7 +54,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateSettings,
       updateProvider,
       isDark: settings.theme === 'dark',
-      toggleTheme
+      toggleTheme,
     }}>
       {children}
     </AppContext.Provider>
