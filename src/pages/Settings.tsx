@@ -7,21 +7,27 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from "@/contexts/AppContext";
-import { AVAILABLE_MODELS } from "@/lib/providers";
+import { AVAILABLE_MODELS, PEKPIK_BASE_URL } from "@/lib/providers";
 import { toast } from "sonner";
 import {
   Eye, EyeOff, CheckCircle2, XCircle, Zap, Shield, Layers,
-  Settings as SettingsIcon, Key, AlertTriangle
+  Settings as SettingsIcon, Key, AlertTriangle,
 } from "lucide-react";
 
 const PROVIDER_DESCRIPTIONS: Record<string, string> = {
-  openai: "OpenAI — GPT-4o, GPT-4-turbo",
-  anthropic: "Anthropic Claude — Requires CORS proxy for browser use",
-  google: "Google Gemini — Gemini 1.5 Pro/Flash",
-  mistral: "Mistral AI — Mistral Large, Medium",
-  deepseek: "DeepSeek — Chat and Coder models",
-  groq: "Groq — Ultra-fast inference (Llama, Mixtral)",
+  openai:    "OpenAI — GPT-4o, GPT-4-turbo",
+  anthropic: "Anthropic Claude — Requires backend proxy (CORS)",
+  google:    "Google Gemini — Gemini 2.0 Flash / 1.5 Pro",
+  mistral:   "Mistral AI — Mistral Large, Medium",
+  deepseek:  "DeepSeek — Chat and Reasoner models",
+  groq:      "Groq — Ultra-fast inference (Llama, Mixtral)",
+  cerebras:  "Cerebras — High-throughput Llama inference",
+  pekpik:    "FreeLLM Hub — 90+ models via OpenAI-compatible gateway",
+  xai:       "xAI Grok — routed through FreeLLM Hub",
+  kimi:      "Kimi — long-context model via FreeLLM Hub",
 };
+
+const PEKPIK_PROVIDERS = new Set(["pekpik", "xai", "kimi"]);
 
 const SYNERGY_MODES = [
   {
@@ -46,7 +52,7 @@ const SYNERGY_MODES = [
 
 function ProviderCard({ providerId }: { providerId: string }) {
   const { settings, updateProvider } = useAppContext();
-  const provider = settings.providers.find(p => p.id === providerId);
+  const provider = settings.providers.find((p) => p.id === providerId);
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
@@ -59,27 +65,42 @@ function ProviderCard({ providerId }: { providerId: string }) {
       return;
     }
     if (provider.id === "anthropic") {
-      toast.error("Anthropic blocks browser CORS requests. A proxy server is required.");
+      toast.error("Anthropic blocks browser CORS requests. Use the backend proxy (start `npm run dev:backend`).");
       return;
     }
+
     setTesting(true);
     setTestResult(null);
     try {
       let endpoint = "";
-      let headers: Record<string, string> = { "Content-Type": "application/json" };
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
       let body: Record<string, unknown> = {};
 
       if (provider.id === "google") {
         endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${provider.model}:generateContent?key=${provider.apiKey}`;
         body = { contents: [{ role: "user", parts: [{ text: "Hi" }] }] };
+      } else if (PEKPIK_PROVIDERS.has(provider.id)) {
+        endpoint = `${PEKPIK_BASE_URL}/chat/completions`;
+        headers["Authorization"] = `Bearer ${provider.apiKey}`;
+        body = {
+          model: provider.model,
+          messages: [{ role: "user", content: "Hi" }],
+          max_tokens: 5,
+        };
       } else {
         const endpoints: Record<string, string> = {
-          openai: "https://api.openai.com/v1/chat/completions",
-          mistral: "https://api.mistral.ai/v1/chat/completions",
+          openai:   "https://api.openai.com/v1/chat/completions",
+          mistral:  "https://api.mistral.ai/v1/chat/completions",
           deepseek: "https://api.deepseek.com/chat/completions",
-          groq: "https://api.groq.com/openai/v1/chat/completions",
+          groq:     "https://api.groq.com/openai/v1/chat/completions",
+          cerebras: "https://api.cerebras.ai/v1/chat/completions",
         };
         endpoint = endpoints[provider.id];
+        if (!endpoint) {
+          toast.error(`No direct test endpoint for ${provider.label}.`);
+          setTesting(false);
+          return;
+        }
         headers["Authorization"] = `Bearer ${provider.apiKey}`;
         body = {
           model: provider.model,
@@ -94,16 +115,18 @@ function ProviderCard({ providerId }: { providerId: string }) {
         body: JSON.stringify(body),
       });
 
-      if (res.ok) {
+      // 400 means the key was accepted but a parameter was rejected — still proves the key works
+      if (res.ok || res.status === 400) {
         setTestResult("success");
         toast.success(`${provider.label} connection successful`);
       } else {
         setTestResult("error");
-        toast.error(`${provider.label}: HTTP ${res.status}`);
+        const txt = await res.text().catch(() => "");
+        toast.error(`${provider.label}: HTTP ${res.status}${txt ? ` — ${txt.slice(0, 80)}` : ""}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setTestResult("error");
-      toast.error(`Connection failed: ${err.message}`);
+      toast.error(`Connection failed: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setTesting(false);
     }
@@ -122,7 +145,9 @@ function ProviderCard({ providerId }: { providerId: string }) {
           <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: provider.color }} />
           <div>
             <div className="font-semibold text-sm">{provider.label}</div>
-            <div className="text-xs text-muted-foreground">{PROVIDER_DESCRIPTIONS[provider.id]}</div>
+            <div className="text-xs text-muted-foreground">
+              {PROVIDER_DESCRIPTIONS[provider.id] ?? provider.id}
+            </div>
           </div>
         </div>
         <Switch
@@ -153,8 +178,10 @@ function ProviderCard({ providerId }: { providerId: string }) {
                 data-testid={`input-apikey-${providerId}`}
               />
               <button
+                type="button"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => setShowKey(!showKey)}
+                aria-label={showKey ? "Hide key" : "Show key"}
               >
                 {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
@@ -190,7 +217,7 @@ function ProviderCard({ providerId }: { providerId: string }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(AVAILABLE_MODELS[providerId] || []).map(m => (
+              {(AVAILABLE_MODELS[providerId] ?? [provider.model]).map((m) => (
                 <SelectItem key={m} value={m}>{m}</SelectItem>
               ))}
             </SelectContent>
@@ -203,8 +230,8 @@ function ProviderCard({ providerId }: { providerId: string }) {
 
 export default function Settings() {
   const { settings, updateSettings } = useAppContext();
-  const enabledCount = settings.providers.filter(p => p.enabled).length;
-  const configuredCount = settings.providers.filter(p => p.apiKey).length;
+  const enabledCount = settings.providers.filter((p) => p.enabled).length;
+  const configuredCount = settings.providers.filter((p) => p.apiKey).length;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
@@ -213,7 +240,7 @@ export default function Settings() {
         <p className="text-muted-foreground text-sm mt-1">
           Configure your AI providers and synergy preferences. All data is stored locally in your browser.
         </p>
-        <div className="flex gap-3 mt-4">
+        <div className="flex flex-wrap gap-3 mt-4">
           <Badge variant="outline" className="gap-1 text-xs">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
             {enabledCount} models enabled
@@ -242,7 +269,7 @@ export default function Settings() {
                 className={`rounded-xl border p-4 text-left transition-all ${
                   active ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/20"
                 }`}
-                onClick={() => updateSettings({ synergyMode: mode.id as any })}
+                onClick={() => updateSettings({ synergyMode: mode.id as "quality" | "balanced" | "speed" })}
                 data-testid={`button-mode-${mode.id}`}
               >
                 <div className="flex items-center gap-2 mb-2">
@@ -269,7 +296,7 @@ export default function Settings() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {settings.providers.filter(p => p.id !== "anthropic").map(p => (
+            {settings.providers.filter((p) => p.id !== "anthropic").map((p) => (
               <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
             ))}
           </SelectContent>
@@ -283,7 +310,7 @@ export default function Settings() {
           Enter API keys for each provider you want to include in the synergy. Keys are saved to localStorage and never leave your device.
         </p>
         <div className="grid gap-4">
-          {settings.providers.map(p => (
+          {settings.providers.map((p) => (
             <ProviderCard key={p.id} providerId={p.id} />
           ))}
         </div>
@@ -296,7 +323,7 @@ export default function Settings() {
         </h2>
         <div className="space-y-2 text-xs text-muted-foreground mt-2">
           <p>API keys are stored exclusively in your browser's localStorage. They are never transmitted to any server operated by this application.</p>
-          <p>All AI requests are made directly from your browser to the respective provider's API endpoints. Your conversations are stored locally only.</p>
+          <p>All AI requests are made directly from your browser to the respective provider's API endpoints (or via your local backend proxy when running it). Your conversations are stored locally only.</p>
           <p>Clearing your browser's localStorage will remove all stored keys and conversations.</p>
         </div>
       </div>

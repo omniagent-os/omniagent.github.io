@@ -8,6 +8,7 @@ import Chat from "@/pages/Chat";
 import Settings from "@/pages/Settings";
 import History from "@/pages/History";
 import Share from "@/pages/Share";
+import ApiKeys from "@/pages/ApiKeys";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/chat" component={Chat} />
       <Route path="/chat/:id" component={Chat} />
       <Route path="/settings" component={Settings} />
+      <Route path="/api-keys" component={ApiKeys} />
       <Route path="/history" component={History} />
       <Route path="/share" component={Share} />
       <Route component={NotFound} />
@@ -25,10 +27,15 @@ function Router() {
 }
 
 function App() {
+  // Wouter base path: strip trailing slash from Vite's BASE_URL.
+  // In dev BASE_URL is "/", which becomes "" (no base). On GitHub Pages it
+  // becomes "/omniagent.github.io" so deep links resolve correctly.
+  const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+
   return (
     <AppProvider>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+        <WouterRouter base={base}>
           <AppLayout>
             <Router />
           </AppLayout>

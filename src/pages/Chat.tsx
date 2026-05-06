@@ -367,6 +367,7 @@ export default function Chat() {
           });
         },
         langToUse,  // ← detected language passed here
+        { synthesisProviderId: settings.synthesisProvider },
       );
 
       setIsSynthesizing(false);
@@ -397,7 +398,7 @@ export default function Chat() {
     } finally {
       setIsProcessing(false);
     }
-  }, [input, isProcessing, activeConv, settings.providers, navigate, convLang]);
+  }, [input, isProcessing, activeConv, settings.providers, settings.synthesisProvider, navigate, convLang]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {

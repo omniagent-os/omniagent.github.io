@@ -1,58 +1,124 @@
-# Corrections appliquées — OmniAgent Synergy OS
+# Corrections appliquées — OmniAgent Synergy OS (round 2)
 
-Ce document liste les corrections apportées au repo
-`omniagent-os/omniagent.github.io` pour résoudre la **page blanche** sur
-GitHub Pages et nettoyer la configuration de déploiement.
+Ce patch corrige les bugs trouvés après l'analyse complète du dépôt
+[`omniagent-os/omniagent.github.io`](https://github.com/omniagent-os/omniagent.github.io)
+et de son déploiement sur GitHub Pages.
 
-## 🔴 Cause racine de la page blanche
+## 🐛 Bugs identifiés et corrigés
 
-Le `index.html` à la racine du repo référence `/src/main.tsx`, qui est le
-**fichier source TypeScript** de Vite. GitHub Pages sert le repo tel quel,
-sans build, donc le navigateur tente de charger un module TypeScript qui
-n'existe pas en tant que ressource statique → écran blanc, erreur dans la
-console : *Failed to load module script*.
+### 1. `src/lib/keyValidator.ts` — regex cassée (bug critique)
 
-De plus :
-- Aucun workflow GitHub Actions n'existait (le README l'annonçait pourtant).
-- Le dossier `dist/` commité contenait `dist/public/index.html` (chemin imbriqué)
-  avec des liens absolus `/assets/...` ne tenant pas compte du `base`
-  `/omniagent.github.io/` → second cas de page blanche même si servi.
-- Pas de `.nojekyll`, donc Jekyll pouvait filtrer certains fichiers.
+L'expression régulière chargée d'extraire les clés depuis le README de
+`free-llm-api-keys` avait perdu **tous** ses anti-slashs :
 
-## ✅ Fichiers corrigés / ajoutés
+```js
+// AVANT (cassé) — interprété comme une alternance vide
+const rowRegex = /|s*`(sk-[A-Za-z0-9]+)`s*|s*([^|]+)|s*[^|]+|.../g;
+```
 
-| Fichier | Action | Rôle |
-|--------|--------|------|
-| `.github/workflows/deploy.yml` | **Ajouté** | Build automatique via Vite avec `BASE_PATH=/omniagent.github.io/` puis déploiement vers GitHub Pages. |
-| `index.html` | Corrigé | `href="%BASE_URL%favicon.svg"` (au lieu de `/favicon.svg`), bloc try/catch sur le SPA-redirect, `<noscript>` ajouté. |
-| `vite.config.ts` | Corrigé | Ajout explicite de `publicDir`, commentaire sur `base`, `assetsDir: "assets"`, output **plat** vers `./dist` (plus de `dist/public/` imbriqué). |
-| `public/404.html` | Corrigé | Détection automatique du `repoBase` à partir de l'URL au lieu d'un hardcode → fonctionne aussi si le repo est renommé. |
-| `public/.nojekyll` | **Ajouté** | Empêche Jekyll de filtrer les fichiers/dossiers commençant par `_`. |
-| `package.json` | Corrigé | Ajout de `typescript` en devDep, script `deploy:check`, version bumpée. |
-| `.gitignore` | **Ajouté** | Exclut `dist/`, `node_modules/`, logs, `.env`, etc. |
+Résultat : `fetchFreeLLMKeys()` renvoyait toujours `[]`, donc l'écran
+"Charger les clés gratuites depuis GitHub" ne montrait jamais rien.
 
-## 🚀 Étapes côté GitHub à effectuer
+✅ Réécrit en parseur ligne-par-ligne robuste qui tolère les variations
+de colonnes du README.
 
-1. Pousser ces fichiers sur la branche `main`.
-2. **Supprimer** le dossier `dist/` du repo (il sera recréé par le workflow) :
-   ```bash
-   git rm -rf dist
-   git commit -m "chore: drop committed build, deployed via Actions"
-   ```
-3. Aller dans **Settings → Pages → Build and deployment → Source = GitHub Actions**.
-4. Le workflow se déclenche au premier push, puis à chaque push sur `main`.
+### 2. `src/pages/ApiKeys.tsx` — page jamais routée + indentation cassée
 
-## 🧪 Vérification locale
+La page existait dans le code source mais n'était **pas enregistrée**
+dans `src/App.tsx`, donc inaccessible. De plus, tout le fichier était
+indenté de 2 espaces de trop, ce qui ne posait pas de problème
+fonctionnel mais cassait la lisibilité.
+
+✅ Indentation nettoyée + route `/api-keys` ajoutée + lien dans la barre
+latérale (`AppLayout.tsx`).
+
+### 3. `src/pages/Settings.tsx` — fournisseurs non gérés dans le bouton "Test"
+
+Le bouton "Test" ne savait pas comment appeler `cerebras`, `pekpik`,
+`xai` ou `kimi` (il jetait silencieusement). Les descriptions
+`PROVIDER_DESCRIPTIONS` étaient également incomplètes.
+
+✅ Routage du test vers `PEKPIK_BASE_URL` pour `pekpik` / `xai` / `kimi`,
+endpoint Cerebras ajouté, descriptions complètes pour tous les providers.
+
+### 4. `src/lib/synergyEngine.ts` — `synthesisProvider` ignoré
+
+Le réglage "Synthesis Model" du panneau Settings n'avait aucun effet :
+`processSynergy` choisissait toujours Groq → Cerebras → … sans
+considérer la préférence utilisateur.
+
+✅ Nouveau paramètre `options.synthesisProviderId` honoré quand le
+provider correspondant a réussi sa réponse, fallback sur l'ordre
+de robustesse sinon. La page Chat passe maintenant
+`settings.synthesisProvider`.
+
+### 5. `src/lib/synergyEngine.ts` — `data.choices[0]` non protégé
+
+Plusieurs accès directs à `data.choices[0].message.content` plantaient
+si l'API renvoyait un objet inattendu (provoquant l'erreur "Cannot read
+properties of undefined").
+
+✅ Tous les accès passent par `?.` avec un fallback chaîne vide.
+
+### 6. `src/components/AppLayout.tsx` — sidebar visible sur la page Share
+
+La page Share est conçue pour être autonome (lien partageable). Or la
+sidebar s'affichait quand même, ce qui rendait le partage moche.
+La détection de l'onglet actif pour `/chat/:id` ne fonctionnait pas
+non plus (le `Synergy Chat` ne s'illuminait que sur `/chat` exact).
+
+✅ Layout sans sidebar quand le path commence par `/share`. Détection
+d'onglet active corrigée (`/chat/:id` matche bien `/chat`).
+
+### 7. `src/App.tsx` — petit refactor robustesse
+
+`import.meta.env.BASE_URL` peut être `undefined` dans certains
+environnements de test ; ajouté un fallback `?? "/"` avant le
+`replace(/\/$/, "")`.
+
+### 8. `public/favicon.svg` — favicon générique
+
+L'ancien favicon était un simple rectangle orange uni avec un saut
+de ligne en tête de fichier (parsing SVG strict en échec dans certains
+navigateurs).
+
+✅ Remplacé par un favicon dégradé violet→bleu cohérent avec
+l'identité visuelle "Synergy OS" (cercle blanc central). Aucun saut de
+ligne parasite.
+
+## 📦 Fichiers modifiés
+
+| Fichier | Type |
+| --- | --- |
+| `src/lib/keyValidator.ts` | Réécriture (regex cassée) |
+| `src/lib/synergyEngine.ts` | Honor synthesisProvider + accès safe |
+| `src/pages/ApiKeys.tsx` | Indentation + nettoyage |
+| `src/pages/Settings.tsx` | Test multi-provider + descriptions |
+| `src/pages/Chat.tsx` | Passe synthesisProvider au moteur |
+| `src/components/AppLayout.tsx` | Lien API Keys + bypass sidebar Share |
+| `src/App.tsx` | Route `/api-keys` + fallback BASE_URL |
+| `public/favicon.svg` | Nouveau favicon, sans BOM |
+
+## 🚀 Pour appliquer
+
+1. Décompresser `omniagent-fixes.zip` à la racine du repo (les chemins
+   sont préservés).
+2. `git status` puis `git add -A && git commit -m "fix: round 2 bug fixes"`.
+3. `git push` — le workflow GitHub Pages reconstruit et redéploie.
+
+## 🧪 Vérification
 
 ```bash
 npm install
-npm run typecheck
-npm run build
-npm run preview     # http://localhost:3000/omniagent.github.io/
+npm run typecheck   # 0 erreur attendu
+npm run build       # build clean
+npm run preview     # http://localhost:5000/omniagent.github.io/
 ```
 
-Le `dist/index.html` final doit contenir des chemins du type :
-```html
-<script type="module" crossorigin src="/omniagent.github.io/assets/index-XXXX.js"></script>
-```
-…et plus jamais `/src/main.tsx`.
+- Le bouton "Charger les clés gratuites depuis GitHub" doit maintenant
+  remplir le tiroir avec des dizaines de clés `sk-…`.
+- Le menu de gauche doit afficher 5 entrées (Overview / Synergy Chat /
+  History / API Keys / Settings).
+- La page `/share#…` doit s'afficher en plein écran sans la sidebar.
+- Le bouton "Test" sur Cerebras / FreeLLM Hub / xAI / Kimi doit
+  retourner OK quand la clé est valide.

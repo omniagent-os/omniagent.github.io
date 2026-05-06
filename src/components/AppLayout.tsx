@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { LayoutDashboard, MessageSquare, History, Settings, Menu, X, Moon, Sun } from 'lucide-react';
+import {
+  LayoutDashboard, MessageSquare, History, Settings, Menu, X, Moon, Sun, Key,
+} from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 
@@ -10,18 +12,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems = [
-    { href: '/', label: 'Overview', icon: LayoutDashboard },
-    { href: '/chat', label: 'Synergy Chat', icon: MessageSquare },
-    { href: '/history', label: 'History', icon: History },
-    { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/',         label: 'Overview',      icon: LayoutDashboard },
+    { href: '/chat',     label: 'Synergy Chat',  icon: MessageSquare },
+    { href: '/history',  label: 'History',       icon: History },
+    { href: '/api-keys', label: 'API Keys',      icon: Key },
+    { href: '/settings', label: 'Settings',      icon: Settings },
   ];
+
+  // The Share page is full-bleed and self-contained — render without the sidebar chrome.
+  const isShareView = location.startsWith('/share');
+  if (isShareView) {
+    return (
+      <div className="min-h-screen w-full bg-background text-foreground selection:bg-primary/30">
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden selection:bg-primary/30">
-      
+
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -53,14 +66,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="px-4 py-2 flex-1">
           <div className="space-y-1">
             {navItems.map((item) => {
-              const active = location === item.href;
+              // Active when path equals href, or when on a nested chat route (/chat/:id)
+              const active = location === item.href
+                || (item.href !== '/' && location.startsWith(item.href + '/'));
               const Icon = item.icon;
               return (
-                <Link key={item.href} href={item.href}>
+                <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}>
                   <div className={`
                     flex items-center gap-3 px-3 py-2 rounded-md transition-all cursor-pointer
-                    ${active 
-                      ? 'bg-primary/10 text-primary font-medium' 
+                    ${active
+                      ? 'bg-primary/10 text-primary font-medium'
                       : 'text-muted-foreground hover:text-foreground hover:bg-secondary'}
                   `}>
                     <Icon className={`h-4 w-4 ${active ? 'text-primary' : ''}`} />
@@ -88,7 +103,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </Button>
           <span className="font-semibold ml-2">OmniAgent Synergy</span>
         </header>
-        
+
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>

@@ -32,6 +32,11 @@ interface CallResult {
   originalProvider?: string;
 }
 
+export interface SynergyOptions {
+  /** Preferred provider id for the final synthesis pass. */
+  synthesisProviderId?: string;
+}
+
 /* ─── Health cache — avoid re-pinging on every message ── */
 let _healthCache: { alive: boolean; at: number } | null = null;
 const HEALTH_TTL = 20_000; // 20 seconds
@@ -71,6 +76,7 @@ export async function processSynergy(
   history: Message[] = [],
   onProgress?: (partial: ModelResponse) => void,
   detectedLanguage: DetectedLanguage = DEFAULT_LANGUAGE,
+  options: SynergyOptions = {},
 ): Promise<{ modelResponses: ModelResponse[]; synthesis: string }> {
 
   // ── Gate: health check (fast ping), NOT key-status check ──
@@ -142,11 +148,22 @@ export async function processSynergy(
   }
 
   // ── Synthesis ──────────────────────────────────────────
-  // Prefer Groq or Cerebras (most reliable) for synthesis
+  // 1. Honor user's explicit preference if it is among the successful responses
+  // 2. Otherwise prefer the most reliable free providers (Groq, Cerebras, …)
+  const userPreferred = options.synthesisProviderId;
   const preferredOrder = ['groq', 'cerebras', 'pekpik', 'openai', 'anthropic', 'google', 'deepseek', 'mistral', 'xai', 'kimi'];
-  const synthesisProviderId =
-    preferredOrder.find((id) => successfulResponses.some((r) => r.usedProvider === id || r.providerId === id)) ??
-    successfulResponses[0].providerId;
+
+  const findById = (id: string) =>
+    successfulResponses.find((r) => r.usedProvider === id || r.providerId === id);
+
+  let synthesisProviderId: string;
+  if (userPreferred && findById(userPreferred)) {
+    synthesisProviderId = userPreferred;
+  } else {
+    synthesisProviderId =
+      preferredOrder.find((id) => !!findById(id)) ?? successfulResponses[0].providerId;
+  }
+
   const synthesisProvider =
     enabledProviders.find((p) => p.id === synthesisProviderId) ?? enabledProviders[0];
 
@@ -216,7 +233,7 @@ async function fetchFromProvider(
   const systemMsg = buildSystemMessage(lang);
   const messages: { role: string; content: string }[] = [
     systemMsg,
-    ...history.filter((h) => h.role !== 'system').map((h) => ({ role: h.role, content: h.content })),
+    ...history.map((h) => ({ role: h.role, content: h.content })),
     { role: 'user', content: message },
   ];
 
@@ -252,7 +269,12 @@ async function fetchFromProvider(
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return { content: data.choices[0].message.content, usedModel: provider.model, usedProvider: provider.id, fallbackUsed: false };
+    return {
+      content: data.choices?.[0]?.message?.content ?? '',
+      usedModel: provider.model,
+      usedProvider: provider.id,
+      fallbackUsed: false,
+    };
   }
 
   const directEndpoints: Record<string, string> = {
@@ -263,6 +285,7 @@ async function fetchFromProvider(
     cerebras: 'https://api.cerebras.ai/v1/chat/completions',
   };
   if (directEndpoints[provider.id]) {
+    if (!provider.apiKey) throw new Error(`No local key for ${provider.id}. Start the backend.`);
     const res = await fetch(directEndpoints[provider.id], {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
@@ -270,14 +293,20 @@ async function fetchFromProvider(
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return { content: data.choices[0].message.content, usedModel: provider.model, usedProvider: provider.id, fallbackUsed: false };
+    return {
+      content: data.choices?.[0]?.message?.content ?? '',
+      usedModel: provider.model,
+      usedProvider: provider.id,
+      fallbackUsed: false,
+    };
   }
 
   if (provider.id === 'google') {
+    if (!provider.apiKey) throw new Error('No local key for google. Start the backend.');
     const geminiContents = [
       { role: 'user',  parts: [{ text: systemMsg.content }] },
       { role: 'model', parts: [{ text: 'Understood.' }] },
-      ...history.filter((m) => m.role !== 'system').map((m) => ({
+      ...history.map((m) => ({
         role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }],
       })),
       { role: 'user', parts: [{ text: message }] },
@@ -288,7 +317,12 @@ async function fetchFromProvider(
     );
     if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
     const data = await res.json();
-    return { content: data.candidates[0].content.parts[0].text, usedModel: provider.model, usedProvider: provider.id, fallbackUsed: false };
+    return {
+      content: data.candidates?.[0]?.content?.parts?.[0]?.text ?? '',
+      usedModel: provider.model,
+      usedProvider: provider.id,
+      fallbackUsed: false,
+    };
   }
 
   throw new Error(`Provider ${provider.id} requires the backend proxy.`);
