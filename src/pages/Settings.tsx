@@ -11,7 +11,7 @@ import { AVAILABLE_MODELS, PEKPIK_BASE_URL } from "@/lib/providers";
 import { toast } from "sonner";
 import {
   Eye, EyeOff, CheckCircle2, XCircle, Zap, Shield, Layers,
-  Settings as SettingsIcon, Key, AlertTriangle,
+  Settings as SettingsIcon, Key, AlertTriangle, Server,
 } from "lucide-react";
 
 const PROVIDER_DESCRIPTIONS: Record<string, string> = {
@@ -231,7 +231,7 @@ function ProviderCard({ providerId }: { providerId: string }) {
 export default function Settings() {
   const { settings, updateSettings } = useAppContext();
   const enabledCount = settings.providers.filter((p) => p.enabled).length;
-  const configuredCount = settings.providers.filter((p) => p.apiKey).length;
+  const configuredCount = settings.providers.filter((p) => p.apiKey.trim()).length;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
@@ -254,6 +254,23 @@ export default function Settings() {
             Stored locally only
           </Badge>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+        <h2 className="font-semibold mb-1 flex items-center gap-2">
+          <Server className="w-4 h-4 text-primary" />
+          Backend Connection
+        </h2>
+        <p className="text-muted-foreground text-xs">
+          Leave this empty to auto-detect a local backend. If you use the published GitHub Pages site, you can enter a backend such as <code className="font-mono">http://127.0.0.1:3001</code>.
+        </p>
+        <Input
+          value={settings.backendUrl}
+          onChange={(e) => updateSettings({ backendUrl: e.target.value })}
+          placeholder="http://127.0.0.1:3001"
+          className="font-mono text-sm"
+          data-testid="input-backend-url"
+        />
       </div>
 
       {/* Synergy Mode */}

@@ -47,4 +47,5 @@ export type AppSettings = {
   synergyMode: SynergyMode;
   theme: 'dark' | 'light';
   synthesisProvider: string;
+  backendUrl: string;
 };

@@ -8,7 +8,8 @@ export const defaultSettings: AppSettings = {
   providers: defaultProviders,
   synergyMode: 'quality',
   theme: 'dark',
-  synthesisProvider: 'openai'
+  synthesisProvider: 'openai',
+  backendUrl: '',
 };
 
 export function getSettings(): AppSettings {

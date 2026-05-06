@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAppContext } from "@/contexts/AppContext";
-import { processSynergy, getBackendStatus } from "@/lib/synergyEngine";
+import { processSynergy, getBackendHealth, getBackendStatus } from "@/lib/synergyEngine";
 import { getConversations, saveConversation, deleteConversation } from "@/lib/storage";
 import { detectLanguage, DEFAULT_LANGUAGE, type DetectedLanguage } from "@/lib/languageDetector";
 import type { Conversation, Message, ModelResponse } from "@/lib/types";
@@ -230,6 +230,24 @@ export default function Chat() {
 
   // Auto-scroll
   useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const health = await getBackendHealth(settings.backendUrl);
+      if (cancelled) return;
+      setBackendAlive(health.alive);
+
+      const status = await getBackendStatus(settings.backendUrl);
+      if (cancelled) return;
+      setBackendReady(status);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.backendUrl]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeConv?.messages, liveResponses, liveSynthesis]);
 
@@ -367,7 +385,7 @@ export default function Chat() {
           });
         },
         langToUse,  // ← detected language passed here
-        { synthesisProviderId: settings.synthesisProvider },
+        { synthesisProviderId: settings.synthesisProvider, backendUrl: settings.backendUrl },
       );
 
       setIsSynthesizing(false);
@@ -398,7 +416,7 @@ export default function Chat() {
     } finally {
       setIsProcessing(false);
     }
-  }, [input, isProcessing, activeConv, settings.providers, settings.synthesisProvider, navigate, convLang]);
+  }, [input, isProcessing, activeConv, settings.providers, settings.synthesisProvider, settings.backendUrl, navigate, convLang]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -424,7 +442,7 @@ export default function Chat() {
   }, [activeConv]);
 
   const enabledCount   = settings.providers.filter((p) => p.enabled).length;
-  const hasLocalKeys   = settings.providers.some((p) => p.apiKey);
+  const hasLocalKeys   = settings.providers.some((p) => p.apiKey.trim());
   // isDemoMode is ONLY true when the backend health ping fails AND there are no local keys.
   // A slow /api/status response no longer triggers demo mode.
   const isDemoMode     = backendAlive === false && !hasLocalKeys;
@@ -608,11 +626,11 @@ export default function Chat() {
                     <code className="font-mono">server/.env</code>, or{" "}
                     <button
                       className="underline underline-offset-2 hover:text-yellow-500"
-                      onClick={() => navigate("/settings")}
+                      onClick={() => navigate("/api-keys")}
                     >
                       enter keys manually
                     </button>{" "}
-                    in Settings.
+                    in API Keys.
                   </div>
                 )}
                 {backendActive && (

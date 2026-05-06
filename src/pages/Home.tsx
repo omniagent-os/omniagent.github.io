@@ -119,7 +119,7 @@ export default function Home() {
               size="lg"
               variant="outline"
               className="gap-2 text-base h-12 px-8"
-              onClick={() => navigate("/settings")}
+              onClick={() => navigate("/api-keys")}
               data-testid="button-configure"
             >
               Configure API Keys
@@ -314,7 +314,7 @@ export default function Home() {
               <ArrowRight className="w-5 h-5" />
             </Button>
             <Button size="lg" variant="outline" className="gap-2 h-12 px-8" onClick={() => navigate("/settings")} data-testid="button-cta-settings">
-              Configure Providers
+              Connect Backend
             </Button>
           </div>
         </div>
