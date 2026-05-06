@@ -49,6 +49,14 @@ export const defaultProviders: Provider[] = [
     enabled: true,
     color: 'hsl(330 81% 60%)',
   },
+  {
+    id: 'cerebras',
+    label: 'Cerebras',
+    apiKey: '',
+    model: 'llama3.1-70b',
+    enabled: true,
+    color: 'hsl(45 96% 56%)',
+  },
 ];
 
 export const AVAILABLE_MODELS: Record<string, string[]> = {
@@ -58,4 +66,5 @@ export const AVAILABLE_MODELS: Record<string, string[]> = {
   mistral:   ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'],
   deepseek:  ['deepseek-chat', 'deepseek-reasoner'],
   groq:      ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
+  cerebras:  ['llama3.1-70b', 'llama3.1-8b', 'llama-4-scout-17b-16e-instruct'],
 };
