@@ -4,24 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>OmniAgent Synergy OS</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="description" content="OmniAgent Synergy OS — Run GPT-4o, Claude, Gemini, Mistral, DeepSeek and Groq in parallel and synthesize one superior answer." />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <script>
+      // SPA redirect: when 404.html bounces a deep link back here through
+      // sessionStorage, restore the original path on top of the configured base.
       (function () {
-        const redirect = sessionStorage.getItem("spa-redirect");
-        if (!redirect) return;
-
-        sessionStorage.removeItem("spa-redirect");
-        const base = "%BASE_URL%".replace(/\/$/, "");
-        const normalizedRedirect = redirect.startsWith("/") ? redirect : `/${redirect}`;
-        window.history.replaceState(null, "", `${base}${normalizedRedirect}`);
+        try {
+          var redirect = sessionStorage.getItem("spa-redirect");
+          if (!redirect) return;
+          sessionStorage.removeItem("spa-redirect");
+          var base = "%BASE_URL%".replace(/\/$/, "");
+          var normalized = redirect.charAt(0) === "/" ? redirect : "/" + redirect;
+          window.history.replaceState(null, "", base + normalized);
+        } catch (e) {
+          // Ignore — sessionStorage may be unavailable in private mode.
+        }
       })();
     </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="padding:2rem;font-family:system-ui,sans-serif;text-align:center">
+        OmniAgent Synergy OS requires JavaScript to run. Please enable it in your browser.
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

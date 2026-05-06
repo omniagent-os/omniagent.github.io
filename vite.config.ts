@@ -10,7 +10,6 @@ function normalizeBasePath(basePath: string) {
   if (!basePath || basePath === "/") {
     return "/";
   }
-
   return `/${basePath.replace(/^\/+|\/+$/g, "")}/`;
 }
 
@@ -22,6 +21,9 @@ export default defineConfig(({ command }) => {
     throw new Error(`Invalid PORT value: "${rawPort}"`);
   }
 
+  // In dev (`vite`), serve from "/". In build, honour BASE_PATH (set by the
+  // GitHub Actions workflow) and fall back to the repo name so GitHub Pages
+  // resolves /omniagent.github.io/assets/* correctly and the page is not blank.
   const base =
     command === "serve"
       ? "/"
@@ -37,9 +39,14 @@ export default defineConfig(({ command }) => {
       dedupe: ["react", "react-dom"],
     },
     root: path.resolve(import.meta.dirname),
+    publicDir: path.resolve(import.meta.dirname, "public"),
     build: {
+      // Output flat into ./dist so GitHub Pages can serve it directly,
+      // not into ./dist/public as the previous broken build did.
       outDir: path.resolve(import.meta.dirname, "dist"),
       emptyOutDir: true,
+      assetsDir: "assets",
+      sourcemap: false,
     },
     server: {
       port,
