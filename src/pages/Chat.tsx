@@ -221,12 +221,12 @@ export default function Chat() {
   // Backend health + status check on mount
   useEffect(() => {
     // Health ping — determines real vs demo mode
-    fetch("/api/health", { signal: AbortSignal.timeout(5000) })
-      .then((r) => setBackendAlive(r.ok))
+    getBackendHealth(settings.backendUrl)
+      .then((health) => setBackendAlive(health.alive))
       .catch(() => setBackendAlive(false));
     // Status — which providers have keys (for the banner list)
-    getBackendStatus().then(setBackendReady);
-  }, []);
+    getBackendStatus(settings.backendUrl).then(setBackendReady);
+  }, [settings.backendUrl]);
 
   // Auto-scroll
   useEffect(() => {

@@ -8,7 +8,7 @@ export const defaultSettings: AppSettings = {
   providers: defaultProviders,
   synergyMode: 'quality',
   theme: 'dark',
-  synthesisProvider: 'openai',
+  synthesisProvider: 'groq',
   backendUrl: '',
 };
 
@@ -25,7 +25,12 @@ export function getSettings(): AppSettings {
       providers: defaultProviders.map(dp => {
         const savedProvider = parsed.providers?.find((p: Provider) => p.id === dp.id);
         if (savedProvider) {
-          return { ...dp, ...savedProvider };
+          return {
+            ...dp,
+            ...savedProvider,
+            apiKey: savedProvider.apiKey?.trim() ? savedProvider.apiKey : dp.apiKey,
+            model: savedProvider.model?.trim() ? savedProvider.model : dp.model,
+          };
         }
         return dp;
       })
