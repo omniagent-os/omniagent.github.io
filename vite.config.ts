@@ -5,11 +5,10 @@ import path from "path";
 
 const DEFAULT_BASE_PATH = "/omniagent.github.io/";
 const DEFAULT_PORT = 3000;
+const BACKEND_PORT = 3001;
 
 function normalizeBasePath(basePath: string) {
-  if (!basePath || basePath === "/") {
-    return "/";
-  }
+  if (!basePath || basePath === "/") return "/";
   return `/${basePath.replace(/^\/+|\/+$/g, "")}/`;
 }
 
@@ -21,9 +20,6 @@ export default defineConfig(({ command }) => {
     throw new Error(`Invalid PORT value: "${rawPort}"`);
   }
 
-  // In dev (`vite`), serve from "/". In build, honour BASE_PATH (set by the
-  // GitHub Actions workflow) and fall back to the repo name so GitHub Pages
-  // resolves /omniagent.github.io/assets/* correctly and the page is not blank.
   const base =
     command === "serve"
       ? "/"
@@ -33,16 +29,12 @@ export default defineConfig(({ command }) => {
     base,
     plugins: [react(), tailwindcss()],
     resolve: {
-      alias: {
-        "@": path.resolve(import.meta.dirname, "src"),
-      },
+      alias: { "@": path.resolve(import.meta.dirname, "src") },
       dedupe: ["react", "react-dom"],
     },
     root: path.resolve(import.meta.dirname),
     publicDir: path.resolve(import.meta.dirname, "public"),
     build: {
-      // Output flat into ./dist so GitHub Pages can serve it directly,
-      // not into ./dist/public as the previous broken build did.
       outDir: path.resolve(import.meta.dirname, "dist"),
       emptyOutDir: true,
       assetsDir: "assets",
@@ -53,6 +45,14 @@ export default defineConfig(({ command }) => {
       strictPort: true,
       host: "0.0.0.0",
       allowedHosts: true,
+      // Proxy /api/* → backend during development
+      proxy: {
+        "/api": {
+          target: `http://localhost:${BACKEND_PORT}`,
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
     preview: {
       port,

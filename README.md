@@ -1,119 +1,102 @@
 # OmniAgent Synergy OS
 
-**Not one model. All of them. Simultaneously.**
-
-A next-generation AI command center that sends every prompt to multiple AI models in parallel - GPT-4o, Claude, Gemini, Mistral, DeepSeek, and Groq - then synthesizes their collective intelligence into one superior answer.
+Send one prompt to **GPT-4o, Claude, Gemini, Mistral, DeepSeek, and Groq** simultaneously — then synthesise their collective intelligence into one superior answer.
 
 ---
 
-## What Makes This Different
+## Quick start
 
-Traditional AI apps let you pick one model. OmniAgent Synergy runs them **all at once**:
-
-1. You send a message
-2. All enabled models receive it simultaneously
-3. You watch each model respond in real time
-4. A synthesis pass combines the best of every response into one unified answer
-5. You keep full access to every individual model's perspective
-
----
-
-## Features
-
-- **Parallel Multi-Model Processing** - All enabled models answer simultaneously via parallel API calls
-- **Synthesis Engine** - A meta-prompt combines all responses into one superior, unified answer
-- **Live Response Feed** - See each model respond with real-time status indicators
-- **6 AI Providers** - OpenAI, Anthropic, Google Gemini, Mistral, DeepSeek, Groq
-- **Demo Mode** - Works without API keys (simulated responses) so the UI is never empty
-- **Local Storage** - API keys and conversations stored in your browser only. No server, no tracking
-- **Dark / Light Mode** - Premium dark-first design, togglable
-- **GitHub Pages Ready** - Pure frontend, deploy anywhere as a static site
-
----
-
-## Tech Stack
-
-- React 18 + TypeScript + Vite
-- Tailwind CSS v4 + shadcn/ui
-- Framer Motion (animations)
-- Wouter (routing)
-- No backend required
-
----
-
-## Deploy to GitHub Pages
-
-### Build locally
-
+### 1 — Frontend only (demo mode)
 ```bash
 npm install
-npm run build
+npm run dev          # http://localhost:3000
+```
+Without API keys the app runs in **demo mode** with simulated responses.
+
+---
+
+### 2 — Frontend + Backend (real AI responses)
+
+#### Step A — Configure API keys
+```bash
+cp server/.env.example server/.env
+# Open server/.env and paste your keys
 ```
 
-The production files are generated in `dist/`.
+Where to get keys (all have free tiers or trials):
 
-### Deploy to GitHub Pages
+| Provider  | URL |
+|-----------|-----|
+| OpenAI    | https://platform.openai.com/api-keys |
+| Anthropic | https://console.anthropic.com/settings/keys |
+| Google    | https://aistudio.google.com/app/apikey |
+| Mistral   | https://console.mistral.ai/api-keys |
+| DeepSeek  | https://platform.deepseek.com/api_keys |
+| Groq      | https://console.groq.com/keys |
 
-This repository now includes a GitHub Actions workflow that:
+You only need keys for the providers you want to use — the rest are skipped automatically.
 
-1. installs dependencies with `npm install`
-2. builds the app with the correct GitHub Pages base path
-3. deploys the `dist/` folder to Pages
+#### Step B — Install backend dependencies
+```bash
+cd server && npm install && cd ..
+```
 
-Just enable **GitHub Pages -> Build and deployment -> GitHub Actions** in the repository settings.
+#### Step C — Run both servers
+```bash
+npm run dev:all
+# Frontend → http://localhost:3000
+# Backend  → http://localhost:3001
+```
 
-### Deploy elsewhere
+Or run them separately:
+```bash
+# Terminal 1
+npm run dev
 
-- Build command: `npm run build`
-- Publish directory: `dist`
-
----
-
-## Configuration
-
-No configuration file needed. On first load:
-
-1. Navigate to **Settings**
-2. Enter API keys for the providers you want to use
-3. Toggle providers on/off
-4. Choose a Synergy Mode (Quality / Balanced / Speed)
-
-All settings are saved to `localStorage` in your browser.
-
-### Supported Providers
-
-| Provider | API Key Source |
-|----------|---------------|
-| OpenAI | platform.openai.com/api-keys |
-| Anthropic | console.anthropic.com | 
-| Google Gemini | aistudio.google.com/app/apikey |
-| Mistral | console.mistral.ai |
-| DeepSeek | platform.deepseek.com |
-| Groq | console.groq.com/keys |
-
-> **Note:** Anthropic's API blocks direct browser requests due to CORS. A local proxy server is needed for Anthropic. All other providers work directly from the browser.
+# Terminal 2
+npm run dev:backend
+```
 
 ---
 
-## Synergy Modes
+## Architecture
 
-| Mode | Description |
-|------|-------------|
-| Quality | All enabled models, maximum context. Best results. |
-| Balanced | Top 4 models by reliability. Good balance. |
-| Speed | Fastest 3 models. Prioritize latency. |
+```
+Browser (React + Vite)
+   │
+   ├── /api/status  ──→  Backend (Express, Node 20)
+   └── /api/proxy   ──→  Backend ──→  OpenAI / Anthropic / Google / Mistral / DeepSeek / Groq
+```
 
----
-
-## Privacy
-
-- API keys are stored exclusively in your browser's `localStorage`
-- No data is ever sent to any server operated by this app
-- All AI requests go directly from your browser to the respective provider's API
-- Conversations are stored locally only - clear localStorage to erase everything
+- **Frontend** — React 18 + TypeScript + Vite 5 + Tailwind CSS v4
+- **Backend** — Node.js 20 + Express, no database needed
+- **API keys** — stored only in `server/.env`, never sent to the browser
+- **Anthropic** — works correctly via backend (CORS is bypassed server-side)
 
 ---
 
-## License
+## Deploying
 
-MIT - free to use, modify, and distribute.
+### Frontend → GitHub Pages (static)
+```bash
+npm run build
+# Push the dist/ folder or use the existing GitHub Actions workflow
+```
+
+### Backend → Any Node host
+Deploy the `server/` folder to Railway, Render, Fly.io, or any VPS.
+Set the environment variables from `server/.env.example` in your host's dashboard.
+Then set `VITE_API_BASE=https://your-backend.railway.app` in your frontend build.
+
+---
+
+## Models used (latest as of 2025)
+
+| Provider  | Default model                  |
+|-----------|-------------------------------|
+| OpenAI    | gpt-4o                        |
+| Anthropic | claude-3-5-sonnet-20241022    |
+| Google    | gemini-2.0-flash              |
+| Mistral   | mistral-large-latest          |
+| DeepSeek  | deepseek-chat                 |
+| Groq      | llama-3.3-70b-versatile       |
