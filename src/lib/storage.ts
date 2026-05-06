@@ -1,5 +1,5 @@
 import { type Provider, type SynergyMode, type AppSettings, type Conversation } from './types';
-import { defaultProviders } from './providers';
+import { defaultProviders, AVAILABLE_MODELS } from './providers';
 
 const SETTINGS_KEY = 'omniagent_settings';
 const CONVERSATIONS_KEY = 'omniagent_conversations';
@@ -8,7 +8,7 @@ export const defaultSettings: AppSettings = {
   providers: defaultProviders,
   synergyMode: 'quality',
   theme: 'dark',
-  synthesisProvider: 'groq',
+  synthesisProvider: 'pekpik',
   backendUrl: '',
 };
 
@@ -18,22 +18,36 @@ export function getSettings(): AppSettings {
     if (!saved) return defaultSettings;
     
     const parsed = JSON.parse(saved);
+    const providers = defaultProviders.map(dp => {
+      const savedProvider = parsed.providers?.find((p: Provider) => p.id === dp.id);
+      if (!savedProvider) return dp;
+
+      const apiKey = savedProvider.apiKey?.trim() ? savedProvider.apiKey : dp.apiKey;
+      const allowedModels = AVAILABLE_MODELS[dp.id] ?? [];
+      const model = savedProvider.model?.trim() && allowedModels.includes(savedProvider.model)
+        ? savedProvider.model
+        : dp.model;
+
+      return {
+        ...dp,
+        ...savedProvider,
+        apiKey,
+        model,
+        enabled: !!apiKey && !!savedProvider.enabled,
+      };
+    });
+
+    const enabledProviders = providers.filter((provider) => provider.enabled && provider.apiKey.trim());
+    const synthesisProvider = enabledProviders.some((provider) => provider.id === parsed.synthesisProvider)
+      ? parsed.synthesisProvider
+      : 'pekpik';
+
     // Merge saved settings with default providers to ensure we have all required fields and new providers
     return {
       ...defaultSettings,
       ...parsed,
-      providers: defaultProviders.map(dp => {
-        const savedProvider = parsed.providers?.find((p: Provider) => p.id === dp.id);
-        if (savedProvider) {
-          return {
-            ...dp,
-            ...savedProvider,
-            apiKey: savedProvider.apiKey?.trim() ? savedProvider.apiKey : dp.apiKey,
-            model: savedProvider.model?.trim() ? savedProvider.model : dp.model,
-          };
-        }
-        return dp;
-      })
+      providers,
+      synthesisProvider,
     };
   } catch (e) {
     console.error('Failed to load settings:', e);

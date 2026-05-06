@@ -25,9 +25,9 @@ export const defaultProviders: Provider[] = [
   {
     id: 'google',
     label: 'Google Gemini',
-    apiKey: 'AIzaSyAB7Z9armox2lhQKri8fbMcA2pKb4B-WDk',
+    apiKey: '',
     model: 'gemini-2.5-flash',
-    enabled: true,
+    enabled: false,
     color: 'hsl(199 89% 48%)',
   },
   {
@@ -41,17 +41,17 @@ export const defaultProviders: Provider[] = [
   {
     id: 'deepseek',
     label: 'DeepSeek',
-    apiKey: 'sk-6473b23670ca41c1b526a5bef72baa1e',
+    apiKey: '',
     model: 'deepseek-chat',
-    enabled: true,
+    enabled: false,
     color: 'hsl(220 100% 60%)',
   },
   {
     id: 'groq',
     label: 'Groq',
-    apiKey: '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',
+    apiKey: '',
     model: 'llama-3.3-70b-versatile',
-    enabled: true,
+    enabled: false,
     color: 'hsl(330 81% 60%)',
   },
   {
@@ -83,9 +83,9 @@ export const defaultProviders: Provider[] = [
   {
     id: 'kimi',
     label: 'Kimi',
-    apiKey: 'sk-pBSHUdLSUP85x457mZr5zDq4DUyNBGNZG9tMtx2FRCFvMjhc',
+    apiKey: '',
     model: 'kimi-k2.5',
-    enabled: true,
+    enabled: false,
     color: 'hsl(180 70% 45%)',
   },
 ];

@@ -184,9 +184,12 @@ export async function processSynergy(
 
   const successfulResponses = modelResponses.filter((response) => response.status === 'done');
   if (successfulResponses.length === 0) {
+    const attemptedProviders = enabledProviders.map((provider) => provider.label).join(', ');
     return {
       modelResponses,
-      synthesis: 'All models failed to respond. Check backend connectivity and API keys.',
+      synthesis: attemptedProviders
+        ? `No enabled provider returned a response. Checked: ${attemptedProviders}. Verify the active API key and keep only providers with a working key enabled.`
+        : 'No enabled provider returned a response. Verify the active API key and keep only providers with a working key enabled.',
     };
   }
 
