@@ -2,7 +2,7 @@
 
 **Not one model. All of them. Simultaneously.**
 
-A next-generation AI command center that sends every prompt to multiple AI models in parallel — GPT-4o, Claude, Gemini, Mistral, DeepSeek, and Groq — then synthesizes their collective intelligence into one superior answer.
+A next-generation AI command center that sends every prompt to multiple AI models in parallel - GPT-4o, Claude, Gemini, Mistral, DeepSeek, and Groq - then synthesizes their collective intelligence into one superior answer.
 
 ---
 
@@ -20,20 +20,20 @@ Traditional AI apps let you pick one model. OmniAgent Synergy runs them **all at
 
 ## Features
 
-- **Parallel Multi-Model Processing** — All enabled models answer simultaneously via parallel API calls
-- **Synthesis Engine** — A meta-prompt combines all responses into one superior, unified answer
-- **Live Response Feed** — See each model respond with real-time status indicators
-- **6 AI Providers** — OpenAI, Anthropic, Google Gemini, Mistral, DeepSeek, Groq
-- **Demo Mode** — Works without API keys (simulated responses) so the UI is never empty
-- **Local Storage** — API keys and conversations stored in your browser only. No server, no tracking
-- **Dark / Light Mode** — Premium dark-first design, togglable
-- **GitHub Pages Ready** — Pure frontend, deploy anywhere as a static site
+- **Parallel Multi-Model Processing** - All enabled models answer simultaneously via parallel API calls
+- **Synthesis Engine** - A meta-prompt combines all responses into one superior, unified answer
+- **Live Response Feed** - See each model respond with real-time status indicators
+- **6 AI Providers** - OpenAI, Anthropic, Google Gemini, Mistral, DeepSeek, Groq
+- **Demo Mode** - Works without API keys (simulated responses) so the UI is never empty
+- **Local Storage** - API keys and conversations stored in your browser only. No server, no tracking
+- **Dark / Light Mode** - Premium dark-first design, togglable
+- **GitHub Pages Ready** - Pure frontend, deploy anywhere as a static site
 
 ---
 
 ## Tech Stack
 
-- React 19 + TypeScript + Vite
+- React 18 + TypeScript + Vite
 - Tailwind CSS v4 + shadcn/ui
 - Framer Motion (animations)
 - Wouter (routing)
@@ -43,32 +43,29 @@ Traditional AI apps let you pick one model. OmniAgent Synergy runs them **all at
 
 ## Deploy to GitHub Pages
 
-### Option 1: Use the pre-built files
-
-The `dist/public/` folder contains the production build. Just serve it as a static site:
-
-1. Push the `dist/public/` contents to the `gh-pages` branch
-2. Enable GitHub Pages → Source: `gh-pages` branch
-
-### Option 2: Build and deploy
+### Build locally
 
 ```bash
-# Install dependencies
-npm install -g pnpm
-pnpm install
-
-# Build (set BASE_PATH to your repo path if using GitHub Pages subpath)
-PORT=3000 BASE_PATH=/ pnpm run build
-# or for subpath (e.g. github.com/user/omniagent-synergy):
-PORT=3000 BASE_PATH=/omniagent-synergy/ pnpm run build
-
-# The built files are in dist/public/
+npm install
+npm run build
 ```
 
-### Option 3: Netlify / Vercel / Cloudflare Pages
+The production files are generated in `dist/`.
 
-- Build command: `PORT=3000 BASE_PATH=/ pnpm run build`
-- Publish directory: `dist/public`
+### Deploy to GitHub Pages
+
+This repository now includes a GitHub Actions workflow that:
+
+1. installs dependencies with `npm install`
+2. builds the app with the correct GitHub Pages base path
+3. deploys the `dist/` folder to Pages
+
+Just enable **GitHub Pages -> Build and deployment -> GitHub Actions** in the repository settings.
+
+### Deploy elsewhere
+
+- Build command: `npm run build`
+- Publish directory: `dist`
 
 ---
 
@@ -113,10 +110,10 @@ All settings are saved to `localStorage` in your browser.
 - API keys are stored exclusively in your browser's `localStorage`
 - No data is ever sent to any server operated by this app
 - All AI requests go directly from your browser to the respective provider's API
-- Conversations are stored locally only — clear localStorage to erase everything
+- Conversations are stored locally only - clear localStorage to erase everything
 
 ---
 
 ## License
 
-MIT — free to use, modify, and distribute.
+MIT - free to use, modify, and distribute.

@@ -20,7 +20,7 @@ const FEATURES = [
   {
     icon: GitMerge,
     title: "Parallel Intelligence",
-    desc: "Every query fires simultaneously to all enabled models. No waiting in line — pure parallel computation.",
+    desc: "Every query fires simultaneously to all enabled models. No waiting in line - pure parallel computation.",
     color: "hsl(262 83% 68%)",
   },
   {
@@ -38,7 +38,7 @@ const FEATURES = [
   {
     icon: Layers,
     title: "Model Transparency",
-    desc: "Every individual model response is preserved and viewable. No black boxes — full visibility into the reasoning.",
+    desc: "Every individual model response is preserved and viewable. No black boxes - full visibility into the reasoning.",
     color: "hsl(30 100% 60%)",
   },
   {
@@ -102,7 +102,7 @@ export default function Home() {
 
           <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
             OmniAgent Synergy sends every prompt to GPT-4o, Claude, Gemini, Mistral, and DeepSeek
-            at the same time — then synthesizes their collective intelligence into one superior answer.
+            at the same time - then synthesizes their collective intelligence into one superior answer.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -330,7 +330,7 @@ export default function Home() {
             <span className="text-sm font-semibold gradient-text">OmniAgent Synergy OS</span>
           </div>
           <p className="text-xs text-muted-foreground font-mono">
-            Open source — no server, no tracking, no subscription
+            Open source - no server, no tracking, no subscription
           </p>
         </div>
       </footer>

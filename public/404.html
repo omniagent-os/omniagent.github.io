@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>OmniAgent Synergy OS</title>
+    <script>
+      (function () {
+        const repoBase = "/omniagent.github.io";
+        const path = window.location.pathname.startsWith(repoBase)
+          ? window.location.pathname.slice(repoBase.length)
+          : window.location.pathname;
+        const redirect = `${path || "/"}${window.location.search}${window.location.hash}`;
+
+        sessionStorage.setItem("spa-redirect", redirect);
+        window.location.replace(`${repoBase}/`);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
